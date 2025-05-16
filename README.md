@@ -383,8 +383,7 @@ Note : Make sure other vars value is "false"
 Make sure you enter the correct node to "hosts" file
 
 ```
-[worker]
-192.168.20.148 host_name=cilium2.worker.bt <--- Target
+192.168.20.148 host_name=cilium2.worker.bt
 ```
 
 ```
