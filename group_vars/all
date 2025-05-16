@@ -17,7 +17,7 @@ kubernetes:
     version: "1.32.*"
 
 registry:
-  - "registry.blackeye.id"
+  - "registry.private.id"
   - "192.168.107.22"
   - "192.168.104.22"
 
