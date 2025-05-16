@@ -11,6 +11,7 @@ Ensure your system meets the following requirements before proceeding:
 
 - **Operating System:** Ubuntu Server 24.04
 - **Kernel Version:** 6.8+
+- **Keppalived Installed**
 
 ## Topology Scenarios
 This repository covers multiple network deployment scenarios using Cilium and BGP, categorized as follows:
