@@ -19,42 +19,42 @@ This repository covers multiple network deployment scenarios using Cilium and BG
 ### A. Common No VLAN
 A standard setup without VLAN segmentation.
 
-![Common No VLAN](assets/common-no-vlan.png)
+![Common No VLAN](assets/common-no-vlan.jpg)
 
 ---
 
 ### B. Common VLAN (Bypass in Cilium Config)
 A VLAN-based setup where Cilium is configured to bypass VLAN handling.
 
-![Common VLAN](assets/common-vlan.png)
+![Common VLAN](assets/common-vlan.jpg)
 
 ---
 
 ### C. BGP Peer Authentication with VLAN (Bypass in Cilium Config)
 BGP setup with peer authentication and VLAN segmentation.
 
-![BGP Peer Authentication with VLAN](assets/bgp-auth-vlan.png)
+![BGP Peer Authentication with VLAN](assets/bgp-auth-vlan.jpg)
 
 ---
 
 ### D. BGP No Peer Authentication with VLAN (Bypass in Cilium Config)
 BGP setup without peer authentication but with VLAN segmentation.
 
-![BGP No Peer Authentication with VLAN](assets/bgp-no-auth-vlan.png)
+![BGP No Peer Authentication with VLAN](assets/bgp-no-auth-vlan.jpg)
 
 ---
 
 ### E. BGP Peer Authentication No VLAN
 BGP setup with peer authentication but without VLAN segmentation.
 
-![BGP Peer Authentication No VLAN](assets/bgp-auth-no-vlan.png)
+![BGP Peer Authentication No VLAN](assets/bgp-auth-no-vlan.jpg)
 
 ---
 
 ### F. BGP No Peer Authentication No VLAN
 BGP setup without peer authentication and without VLAN segmentation.
 
-![BGP No Peer Authentication No VLAN](assets/bgp-no-auth-no-vlan.png)
+![BGP No Peer Authentication No VLAN](assets/bgp-no-auth-no-vlan.jpg)
 
 ---
 
