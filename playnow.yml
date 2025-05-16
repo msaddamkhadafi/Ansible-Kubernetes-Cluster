@@ -1,0 +1,30 @@
+- name: Install k8s
+  hosts: all
+
+  vars:
+    #Kubernetes 
+    install_k8s_dependencies: false
+    init_k8s_master: false
+    join_k8s_masters: false
+    join_k8s_workers: false
+    reboot_after_update: false
+
+    #Cilium (Select One)
+    install_cilium_common: false               # Install Cilium with a common setup (Bypasses VLAN)
+    install_cilium_common_no_vlan: false       # Install Cilium with a common setup (No VLAN)
+    install_cilium_bgp_auth: false             # Install Cilium with BGP and authentication (Bypasses VLAN)
+    install_cilium_bgp_no_auth: false          # Install Cilium with BGP but without authentication (Bypasses VLAN)
+    install_cilium_bgp_auth_no_vlan: false     # Install Cilium with BGP and authentication (No VLAN)
+    install_cilium_bgp_no_auth_no_vlan: false  # Install Cilium with BGP but without authentication (No VLAN)
+
+    #Optional
+    add_private_registry: false                      # Add New Private Registry
+    get_join_command_and_control_plane_token: false  # Retrieve Join command and Control Plane TOKEN
+    update_hosts: false                              # Update /etc/hosts
+    uninstall_k8s: false                             # use with careful (Make Sure There Is No Job Set To "true")
+
+  # Leave it as is
+  roles:
+    - k8s
+    - cilium
+    - optional

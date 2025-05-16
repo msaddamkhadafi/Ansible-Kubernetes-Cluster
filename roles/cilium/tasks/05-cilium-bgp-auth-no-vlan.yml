@@ -1,0 +1,207 @@
+#Helm Setup
+- name: Download Helm command line tool
+  ansible.builtin.uri:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    return_content: true
+  register: helm_installer
+
+- name: Install Helm
+  ansible.builtin.command:
+    cmd: bash
+    stdin: "{{ helm_installer.content }}"
+    creates: /usr/local/bin/helm
+  environment:
+    DESIRED_VERSION: "{{ helm_version | default('') }}"
+
+- name: Add cilium chart repo
+  kubernetes.core.helm_repository:
+    name: cilium
+    repo_url: "https://helm.cilium.io"
+  ignore_errors: true
+
+- name: Update Repo
+  command: helm repo update
+
+#Deploy Gateway API
+- name: Deploy Gateway API
+  shell: |
+    for file in \
+      https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.1.0/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml \
+      https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.1.0/config/crd/standard/gateway.networking.k8s.io_gateways.yaml \
+      https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.1.0/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml \
+      https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.1.0/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml \
+      https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.1.0/config/crd/standard/gateway.networking.k8s.io_grpcroutes.yaml \
+      https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.1.0/config/crd/experimental/gateway.networking.k8s.io_tlsroutes.yaml; do
+      kubectl apply -f "$file"
+    done
+
+#CILIUM BGP and Bypass Vlan
+- name: Deploy Cilium BGP Auth No Vlan
+  kubernetes.core.helm:
+    name: cilium
+    chart_ref: cilium/cilium
+    release_namespace: kube-system
+    update_repo_cache: True
+    values:
+        k8sServiceHost: "{{ item }}"
+        k8sServicePort: "6443"
+        k8s:
+          requireIPv4PodCIDR: true
+        externalIPs:
+          enabled: true
+        routingMode: "native"
+        bpf:
+          hostLegacyRouting: false
+          datapathMode: "netkit"
+          masquerade: true
+          preallocateMaps: true
+        bgpControlPlane:
+          enabled: true
+        ipv4:
+          enabled: true
+        kubeProxyReplacement: true
+        bandwidthManager:
+          enabled: true
+        ipam:
+          mode: "cluster-pool"
+          operator:
+            clusterPoolIPv4PodCIDRList:
+              - "10.244.0.0/16"
+            clusterPoolIPv4MaskSize: 23 # Max Nodes 128
+        ipv4NativeRoutingCIDR: "10.244.0.0/16"
+        loadBalancer:
+          mode: "dsr"
+          dsrDispatch: "geneve"
+          l7:
+            backend: "envoy"
+        autoDirectNodeRoutes: true
+        gatewayAPI:
+          enabled: true
+        tunnelProtocol: "geneve"
+        directRoutingSkipUnreachable: true
+        bpfClockProbe: true
+        hubble:
+          relay:
+            enabled: true
+          ui:
+            enabled: true
+            service:
+               type: LoadBalancer
+        #   metrics:
+        #     enabled:
+        #       - "dns:query;ignoreAAAA"
+        #       - "drop"
+        #       - "flow"
+        #       - "flows-to-world"
+        #       - "httpV2:exemplars=true;labelsContext=source_ip,source_namespace,source_workload,destination_ip,destination_namespace,destination_workload,traffic_direction"
+        #       - "icmp"
+        #       - "port-distribution"
+        #       - "tcp"
+        #     enableOpenMetrics: true
+        # prometheus:
+        #   enabled: true
+        # operator:
+        #   prometheus:
+        #     enabled: true
+
+  with_items:
+    - "{{ k8s_ipv }}"
+
+- name: Get specific Cilium pod name
+  shell: >
+    kubectl get pods -n kube-system -l k8s-app=cilium -o jsonpath='{.items[0].metadata.name}'
+  register: cilium_pod_name
+
+- name: Wait for the specific Cilium pod to be Ready
+  shell: >
+    kubectl wait --for=condition=Ready pod/{{ cilium_pod_name.stdout }} -n kube-system --timeout=600s
+  register: cilium_ready
+
+- debug: var=cilium_ready.stdout_lines
+
+- name: Done ga bang?
+  debug:
+    msg:
+    - "🔥 MENYALA ABANGKU 🔥"
+
+- pause:
+    seconds: 5
+
+#Cilium BGP Config (auth)
+- name: Create Secret
+  command: >-
+    kubectl -n kube-system create secret generic
+    --type=string bgp-secret
+    --from-literal=password={{ item.bgpAuth }}
+  with_items: "{{ bgp }}"
+
+- name: BGP config
+  shell: |
+    kubectl apply -f - <<EOF
+    apiVersion: cilium.io/v2alpha1
+    kind: CiliumBGPClusterConfig
+    metadata:
+      name: cilium-bgp
+    spec:
+      nodeSelector:
+        matchLabels:
+          route: "bgp"
+      bgpInstances:
+      - name: "instance-{{ item.localASN }}"
+        localASN: {{ item.localASN }}
+        peers:
+        - name: "peer-{{ item.peerASN }}"
+          peerASN: {{ item.peerASN }}
+          peerAddress: {{ item.peerAddress }}
+          peerConfigRef:
+            name: "cilium-peer"
+    ---
+    apiVersion: cilium.io/v2alpha1
+    kind: CiliumBGPPeerConfig
+    metadata:
+      name: cilium-peer
+    spec:
+      timers:
+        connectRetryTimeSeconds: 12
+        holdTimeSeconds: 9
+        keepAliveTimeSeconds: 3
+      authSecretRef: bgp-secret
+      ebgpMultihop: 4
+      gracefulRestart:
+        enabled: true
+        restartTimeSeconds: 20
+      families:
+        - afi: ipv4
+          safi: unicast
+          advertisements:
+            matchLabels:
+              advertise: "bgp"
+    ---
+    apiVersion: cilium.io/v2alpha1
+    kind: CiliumBGPAdvertisement
+    metadata:
+      name: bgp-advertisements
+      labels:
+        advertise: bgp
+    spec:
+      advertisements:
+        - advertisementType: "PodCIDR"
+        - advertisementType: "Service"
+          service:
+            addresses:
+              - ExternalIP
+              - LoadBalancerIP
+          selector:
+            matchExpressions:
+              - {key: somekey, operator: NotIn, values: ['never-exist']}
+    EOF
+  with_items:
+    - "{{ bgp }}"
+
+- name: Tag BGP node
+  shell: "kubectl label node {{ item }} route=bgp"
+  loop: "{{ bgp_peers }}"
+
+# - name: Deploy Grafana
+#   shell: >
+#     kubectl apply -f https://raw.githubusercontent.com/cilium/cilium/1.16.5/examples/kubernetes/addons/prometheus/monitoring-example.yaml

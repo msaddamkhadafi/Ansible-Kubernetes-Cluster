@@ -1,0 +1,8 @@
+- name: Change hostname
+  hostname:
+    name: "{{ hostvars[inventory_hostname]['host_name'] }}"
+  when: hostvars[inventory_hostname]['host_name'] is defined
+
+- name: Update /etc/hosts from inventory
+  lineinfile: dest=/etc/hosts regexp='.*{{item}}$' line='{{hostvars[item]['inventory_hostname'] }}   {{hostvars[item]['host_name']}} ' state=present
+  with_items: '{{groups.all}}'

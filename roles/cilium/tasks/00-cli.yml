@@ -1,0 +1,79 @@
+#Cilium CLI
+- name: Get Version [Cilium CLI]
+  uri:
+    url: "https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt"
+    method: GET
+    return_content: yes
+  register: cilium_version
+
+- name: Show downloaded content [Cilium CLI]
+  debug:
+    msg: "{{ cilium_version.content }}"
+
+- name: Download [Cilium CLI]
+  get_url:
+    url: "https://github.com/cilium/cilium-cli/releases/download/{{ cilium_version.content | trim }}/cilium-linux-amd64.tar.gz"
+    dest: "/tmp/cilium-linux-amd64.tar.gz"
+    mode: "0755"
+
+- name: Download file sha256sum [Cilium CLI]
+  get_url:
+    url: "https://github.com/cilium/cilium-cli/releases/download/{{ cilium_version.content | trim }}/cilium-linux-amd64.tar.gz.sha256sum"
+    dest: "/tmp/cilium-linux-amd64.tar.gz.sha256sum"
+    mode: "0755"
+
+- name: Verify SHA256 checksum [Cilium CLI]
+  command: 
+    cmd: "sha256sum --check cilium-linux-amd64.tar.gz.sha256sum"
+    chdir: "/tmp"
+  register: checksum_result
+
+- name: Show checksum verification result [Cilium CLI]
+  debug:
+    var: checksum_result.stdout
+
+- name: Extract and copy [Cilium CLI]
+  unarchive:
+    src: /tmp/cilium-linux-amd64.tar.gz
+    dest: /usr/local/bin
+    remote_src: yes
+
+#Hublle CLI
+- name: Get Version [Hubble CLI]
+  uri:
+    url: "https://raw.githubusercontent.com/cilium/hubble/master/stable.txt"
+    method: GET
+    return_content: yes
+  register: hubble_version
+
+- name: Show downloaded content [Hubble CLI]
+  debug:
+    msg: "{{ hubble_version.content }}"
+
+- name: Download [Hubble CLI]
+  get_url:
+    url: "https://github.com/cilium/hubble/releases/download/{{ hubble_version.content | trim }}/hubble-linux-amd64.tar.gz"
+    dest: "/tmp/hubble-linux-amd64.tar.gz"
+    mode: "0755"
+
+- name: Download file sha256sum [Hubble CLI]
+  get_url:
+    url: "https://github.com/cilium/hubble/releases/download/{{ hubble_version.content | trim }}/hubble-linux-amd64.tar.gz.sha256sum"
+    dest: "/tmp/hubble-linux-amd64.tar.gz.sha256sum"
+    mode: "0755"
+
+- name: Verify SHA256 checksum [Hubble CLI]
+  command: 
+    cmd: "sha256sum --check hubble-linux-amd64.tar.gz.sha256sum"
+    chdir: "/tmp"
+  register: checksum_result
+
+- name: Show checksum verification result [Hubble CLI]
+  debug:
+    var: checksum_result.stdout
+
+- name: Extract and copy [Hubble CLI]
+  unarchive:
+    src: /tmp/hubble-linux-amd64.tar.gz
+    dest: /usr/local/bin
+    remote_src: yes

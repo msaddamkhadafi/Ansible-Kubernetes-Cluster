@@ -1,0 +1,13 @@
+- name: Create directory for each registry
+  file:
+    path: "/etc/containerd/certs.d/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ registry }}"
+
+- name: Create host.toml file for each registry
+  template:
+    src: roles/k8s/templates/conf/hosts.toml.j2
+    dest: "/etc/containerd/certs.d/{{ item }}/hosts.toml"
+    mode: '0644'
+  loop: "{{ registry }}"

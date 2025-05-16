@@ -1,0 +1,15 @@
+- name: Copy Kubernetes join command from Ansible host to worker nodes
+  copy:
+    src: join/kubernetes_join_command
+    dest: /tmp/kubernetes_join_command
+    mode: 0777
+
+- name: Retrieve Kubernetes join command on worker nodes
+  shell: cat /tmp/kubernetes_join_command
+  register: joinkan
+
+- name: Execute Kubernetes join command on worker nodes
+  shell: "{{ joinkan.stdout }} >> cluster_initialized.log"
+  args:
+    chdir: /tmp
+    creates: cluster_initialized.log

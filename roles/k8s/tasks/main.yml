@@ -1,0 +1,16 @@
+---
+- name: Install Kubernetes dependencies on all nodes
+  include_tasks: 01-install-k8s-dependencies.yml
+  when: install_k8s_dependencies and inventory_hostname in groups['all']
+
+- name: Initialize Kubernetes master node
+  include_tasks: 02-init-k8s-master.yml
+  when: init_k8s_master and inventory_hostname in groups['masterinit']
+
+- name: Join master nodes to the Kubernetes cluster
+  include_tasks: 03-join-k8s-masters.yml
+  when: join_k8s_masters and inventory_hostname in groups['master']
+
+- name: Join worker nodes to the Kubernetes cluster
+  include_tasks: 04-join-k8s-workers.yml
+  when: join_k8s_workers and inventory_hostname in groups['worker']

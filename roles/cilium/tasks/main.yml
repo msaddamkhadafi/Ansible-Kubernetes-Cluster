@@ -1,0 +1,28 @@
+---
+- name: Install Cilium And Hubble CLI
+  include_tasks: 00-cli.yml
+  when: install_cilium_bgp_auth or install_cilium_bgp_no_auth or install_cilium_common or install_cilium_common_no_vlan or install_cilium_bgp_auth_no_vlan or install_cilium_bgp_no_auth_no_vlan and inventory_hostname in groups['masterinit']
+
+- name: Install Cilium BGP Auth
+  include_tasks: 01-cilium-bgp-auth.yml
+  when: install_cilium_bgp_auth and inventory_hostname in groups['masterinit']
+
+- name: Install Cilium BGP no Auth
+  include_tasks: 02-cilium-bgp-no-auth.yml
+  when: install_cilium_bgp_no_auth and inventory_hostname in groups['masterinit']
+
+- name: Install Cilium BGP Common
+  include_tasks: 03-cilium-common.yml
+  when: install_cilium_common and inventory_hostname in groups['masterinit']
+
+- name: Install Cilium Common no Vlan
+  include_tasks: 04-cilium-common-no-vlan.yml
+  when: install_cilium_common_no_vlan and inventory_hostname in groups['masterinit']
+
+- name: Install Cilium BGP Auth No Vlan
+  include_tasks: 05-cilium-bgp-auth-no-vlan.yml
+  when: install_cilium_bgp_auth_no_vlan and inventory_hostname in groups['masterinit']
+
+- name: Install Cilium BGP No Auth No Vlan
+  include_tasks: 06-cilium-bgp-no-auth-no-vlan.yml
+  when: install_cilium_bgp_no_auth_no_vlan and inventory_hostname in groups['masterinit']

@@ -1,0 +1,39 @@
+- name: Copy Kubernetes join command to master nodes
+  copy:
+    src: join/kubernetes_join_command
+    dest: /tmp/kubernetes_join_command
+    mode: 0777
+
+- name: Copy Kubernetes master token to master nodes
+  copy:
+    src: join/kubernetes_master_token
+    dest: /tmp/kubernetes_master_token
+    mode: 0777
+
+- name: Retrieve Kubernetes master token
+  shell: cat /tmp/kubernetes_master_token
+  register: tokennya
+
+- name: Retrieve Kubernetes join command
+  shell: cat /tmp/kubernetes_join_command
+  register: joinkan
+
+- name: Execute join command for control-plane node
+  shell: "{{ joinkan.stdout }} --control-plane --certificate-key {{ tokennya.stdout }} >> cluster_initialized.log"
+  args:
+    chdir: /tmp
+    creates: cluster_initialized.log
+  when: joinkan.stdout is defined and tokennya.stdout is defined
+
+- name: Create .kube directory for Kubernetes configuration
+  file:
+    path: $HOME/.kube
+    state: directory
+    mode: 0755
+
+- name: Copy admin.conf to Kubernetes configuration directory
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: /root/.kube/config
+    remote_src: yes
+    owner: root

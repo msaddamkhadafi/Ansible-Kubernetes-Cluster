@@ -1,0 +1,50 @@
+- name: Reset K8S
+  shell: kubeadm reset --force
+  ignore_errors: true
+
+- name: Stop Kube & Containerd
+  systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  loop:
+    - kubelet
+    - containerd
+  ignore_errors: true
+  
+- name: Unhold Kubernetes packages
+  shell: apt-mark unhold {{ item }}
+  loop:
+    - kubeadm
+    - kubectl
+    - kubelet
+    
+- name: Uninstall Kube & Containerd
+  apt:
+    name: "{{ item }}"
+    state: absent
+  loop:
+    - kube*
+    - container*
+
+- name: Delete content & directory
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/cni
+    - /var/lib/kubelet
+    - /etc/cni
+    - /var/lib/containerd
+    - /etc/containerd
+    - /etc/kubernetes
+    - /var/lib/etcd
+    - /etc/sysctl.d/99-kubernetes-cri.conf
+    - /usr/local/bin/cilium
+    - /usr/local/bin/hubble
+    - /etc/apt/sources.list.d/containerd.list
+    - /etc/apt/sources.list.d/kubernetes.list
+    - /etc/sysctl.d/99-zzz-override_cilium.conf
+
+- name: Reboot and wait for reboot to complete
+  reboot:

@@ -1,0 +1,16 @@
+---
+- name: Add Private Registry
+  include_tasks: 01-add-private-registry.yml
+  when: add_private_registry and inventory_hostname in groups['all']
+
+- name: get the join command and control plane token
+  include_tasks: 02-generate-kubernetes-join-token.yml
+  when: get_join_command_and_control_plane_token and inventory_hostname in groups['masterinit']
+
+- name: Update /etc/hosts
+  include_tasks: 03-update-hosts.yml
+  when: update_hosts and inventory_hostname in groups['all']
+
+- name: Uninstall K8S
+  include_tasks: 04-uninstall-k8s.yml
+  when: uninstall_k8s and inventory_hostname in groups['all']

@@ -1,0 +1,13 @@
+[masterinit]
+192.168.20.143 host_name=cilium.master.bt
+
+[master]
+
+[worker]
+
+
+[all:vars]
+ansible_connection='ssh'
+ansible_ssh_port='22'
+ansible_user='root'
+ansible_ssh_pass='rahasia2025'

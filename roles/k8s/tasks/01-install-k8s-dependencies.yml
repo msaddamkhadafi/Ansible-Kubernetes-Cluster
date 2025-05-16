@@ -1,0 +1,208 @@
+---
+- name: Check OS version
+  fail:
+    msg: "OS should be Ubuntu 24.04, not {{ ansible_distribution }} {{ ansible_distribution_version }}"
+  when: ansible_distribution != 'Ubuntu' or 
+        (ansible_distribution_version != '24.04')
+
+- name: Change hostname
+  hostname:
+    name: "{{ hostvars[inventory_hostname]['host_name'] }}"
+  when: hostvars[inventory_hostname]['host_name'] is defined
+
+- name: Update /etc/hosts from inventory
+  lineinfile: dest=/etc/hosts regexp='.*{{item}}$' line='{{hostvars[item]['inventory_hostname'] }}   {{hostvars[item]['host_name']}} ' state=present
+  with_items: '{{groups.all}}'
+
+- name: Set timezone to Asia/Jakarta
+  timezone:
+    name: "{{ item }}"
+  with_items:
+    - "{{ timezone }}"
+
+- name: Update APT packages
+  apt:
+    update_cache: yes
+    autoremove: yes
+
+- name: Install NFS
+  apt:
+    name: nfs-common
+    state: present
+
+- name: Reboot and wait for reboot to complete
+  reboot:
+  when: reboot_after_update
+
+- name: Verify kernel version
+  fail:
+    msg: "Kernel version ({{ ansible_kernel }}) does not meet the minimum requirements 6.8.0"
+  when: ansible_kernel is version('6.8.0', '<')
+
+- name: Disable SWAP (Kubeadm requirement)
+  shell: swapoff -a
+
+- name: Disable SWAP in fstab (Kubeadm requirement)
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+
+- name: Add crontab entry for disabling swap on reboot (Kubeadm requirement)
+  cron:
+    name: "Disable Swap on Reboot"
+    special_time: reboot
+    job: "swapoff -a"
+
+- name: Create an empty file for Kubernetes sysctl params
+  copy:
+    content: ""
+    dest: /etc/sysctl.d/99-kubernetes-cri.conf
+    force: no
+
+- name: Configure sysctl params for Kubernetes
+  lineinfile:
+    path: /etc/sysctl.d/99-kubernetes-cri.conf
+    line: "{{ item }}"
+  with_items:
+    - "{{ k8s_sysctl }}"
+
+- name: Apply sysctl params without reboot
+  command: sysctl --system
+
+- name: Install APT Transport HTTPS
+  apt:
+    name: apt-transport-https
+    state: present
+
+- name: Add Containerd apt-key
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker-apt-keyring.asc
+    mode: '0644'
+    force: true
+
+- name: Add Containerd APT repository
+  apt_repository:
+    repo: "deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }} signed-by=/etc/apt/keyrings/docker-apt-keyring.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    state: present
+    filename: containerd
+    update_cache: yes
+
+- name: Install Containerd
+  apt:
+    name: containerd.io
+    state: present
+
+- name: create Containerd directory
+  file:
+    path: /etc/containerd
+    state: directory
+
+- name: add Containerd configuration
+  shell: /usr/bin/containerd config default > /etc/containerd/config.toml
+
+- name: configuring the systemd cgroup driver for Containerd
+  lineinfile:
+    path: /etc/containerd/config.toml
+    regexp: '            SystemdCgroup = false'
+    line: '            SystemdCgroup = true'
+
+- name: configuring config_path
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: '(\[plugins\."io\.containerd\.grpc\.v1\.cri"\.registry\][^\[]*config_path =) ".*"'
+    replace: '\1 "/etc/containerd/certs.d"'
+
+- name: Create directory for each registry
+  file:
+    path: "/etc/containerd/certs.d/{{ item }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ registry }}"
+
+- name: Create host.toml file for each registry
+  template:
+    src: conf/hosts.toml.j2
+    dest: "/etc/containerd/certs.d/{{ item }}/hosts.toml"
+    mode: '0644'
+  loop: "{{ registry }}"
+
+- name: enable the Containerd service and start it
+  systemd:
+    name: containerd
+    state: restarted
+    enabled: yes
+    daemon-reload: yes
+
+- name: Add Kubernetes apt-key
+  get_url:
+    url: "{{ item.key }}"
+    dest: /etc/apt/keyrings/kubernetes-apt-keyring.asc
+    mode: '0644'
+    force: true
+  loop: "{{ kubernetes }}"
+
+- name: Add Kubernetes' APT repository
+  apt_repository:
+    repo: "{{ item.url }}"
+    state: present
+    update_cache: yes
+    filename: kubernetes
+  loop: "{{ kubernetes }}"
+
+- name: Install Kubectl
+  apt:
+    name: "kubectl={{ item.version }}"
+    state: present
+  loop: "{{ kubernetes }}"
+
+- name: Install Kubelet
+  apt:
+    name: "kubelet={{ item.version }}"
+    state: present
+  loop: "{{ kubernetes }}"
+
+- name: Install Kubeadm
+  apt:
+    name: "kubeadm={{ item.version }}"
+    state: present
+  loop: "{{ kubernetes }}"
+
+
+- name: Hold Kubernetes packages
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubeadm
+    - kubectl
+    - kubelet
+
+- name: Enable the Kubelet service, and enable it persistently
+  service:
+    name: kubelet
+    enabled: yes
+
+- name: Load br_netfilter kernel module
+  modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Presistent br_netfilter
+  lineinfile:
+    path: /etc/modules-load.d/modules.conf
+    line: br_netfilter
+
+- name: Load overlay kernel module
+  modprobe:
+    name: overlay
+    state: present
+
+- name: Kill irqbalance
+  command: killall irqbalance
+  ignore_errors: true
+
+- name: Set CPU governor to performance
+  shell: echo performance | tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor
+  ignore_errors: true
